@@ -10,7 +10,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
+    </style>
+""", unsafe_allow_html=True)
 def get_base64_image(image_path):
     try:
         with open(image_path, "rb") as img_file:
