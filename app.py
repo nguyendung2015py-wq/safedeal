@@ -206,6 +206,13 @@ def analyze_safedeal(text: str) -> AnalysisResult:
 
 def main():
     inject_custom_styles()
+    st.markdown("""
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        </style>
+    """, unsafe_allow_html=True)
 
     logo_b64 = get_base64_image("logo.png")
     if logo_b64:
