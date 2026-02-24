@@ -1,4 +1,4 @@
-import streamlit as st
+iimport streamlit as st
 import base64
 import random
 from datetime import datetime
@@ -10,14 +10,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .stDeployButton {display:none;}
-    </style>
-""", unsafe_allow_html=True)
+
 def get_base64_image(image_path):
     try:
         with open(image_path, "rb") as img_file:
@@ -29,14 +22,22 @@ def inject_custom_styles() -> None:
     st.markdown(
         """
         <style>
-        /* СКРЫВАЕМ БЕСПЛАТНЫЙ ИНТЕРФЕЙС STREAMLIT И GITHUB */
-        [data-testid="stHeader"] { display: none !important; }
-        footer { display: none !important; }
-        #MainMenu { display: none !important; }
-        [data-testid="stToolbar"] { display: none !important; }
+        /* УБИВАЕМ КОРОНУ И ЛИШНИЙ ИНТЕРФЕЙС (МАКСИМАЛЬНАЯ ЗАЩИТА) */
+        header {visibility: hidden !important;}
+        footer {visibility: hidden !important; display: none !important;}
+        #MainMenu {visibility: hidden !important; display: none !important;}
+        [data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"] { display: none !important; }
+        
+        /* Скрываем красную плашку Cloud */
+        .viewerBadge_container, .viewerBadge_link, [data-testid="stViewerBadge"], .stDeployButton { 
+            display: none !important; 
+            visibility: hidden !important; 
+            opacity: 0 !important; 
+        }
+        
+        section[data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none !important; }
 
         body { background-color: #ffffff; color: #2d3436; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
-        section[data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none !important; }
         .main .block-container { padding-top: 2rem; max-width: 950px; }
 
         .header-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; margin-bottom: 2rem; }
@@ -63,7 +64,6 @@ def inject_custom_styles() -> None:
         .decision-text-main { font-size: 1.1rem; font-weight: 700; text-transform: uppercase; }
         .decision-text-sub { font-size: 0.9rem; color: #4b5563; margin-top: 5px; }
 
-        /* Таблица с адаптацией под мобильные устройства */
         .table-wrapper { width: 100%; overflow-x: auto; margin-top: 1rem; border-radius: 8px; border: 1px solid #e5e7eb; }
         .risk-table { width: 100%; border-collapse: collapse; min-width: 600px; }
         .risk-table th { background-color: #f9fafb; font-weight: 700; padding: 12px; border-bottom: 2px solid #e5e7eb; text-align: left; font-size: 0.9rem; }
@@ -75,7 +75,6 @@ def inject_custom_styles() -> None:
         .report-header { text-align: right; color: #6b7280; font-size: 0.8rem; font-weight: 600; margin-bottom: 10px; border-bottom: 1px dashed #e5e7eb; padding-bottom: 5px; }
         .footer-disclaimer { text-align: center; font-size: 0.75rem; color: #9ca3af; margin-top: 3rem; border-top: 1px solid #f3f4f6; padding-top: 1.5rem; line-height: 1.5; }
 
-        /* Медиа-запросы для смартфонов */
         @media (max-width: 768px) {
             .hero-title { font-size: 1.6rem; }
             .hero-subtitle { font-size: 0.95rem; }
@@ -105,7 +104,6 @@ def analyze_safedeal(text: str) -> AnalysisResult:
     items = []
     
     risks = [
-        # --- БЛОК 1: ОБЪЕКТ И ИСТОРИЯ ---
         {"cat": "object", "what": "Объект в залоге (ипотека банка)", 
          "kw": ["в ипотеке", "залог", "обременен", "под залогом", "ипотечн", "в силу закона"], 
          "law": "<b>ФЗ №102-ФЗ «Об ипотеке» ст. 37.</b> Отчуждение заложенного имущества допускается только с письменного согласия залогодержателя. Сделка без согласия ничтожна.", 
@@ -146,7 +144,6 @@ def analyze_safedeal(text: str) -> AnalysisResult:
          "law": "<b>ЖК РФ ст. 29. КоАП РФ ст. 7.21.</b> Вся материальная ответственность за незаконную перепланировку переходит на покупателя.", 
          "fix": "Визуальная сверка фактического состояния квартиры с планом БТИ.", "w": 10.0},
 
-        # --- БЛОК 2: СТАТУС ПРОДАВЦА ---
         {"cat": "seller", "what": "Банкротство, долги и суды", 
          "kw": ["банкрот", "пристав", "долг", "фссп", "судебн", "ниже рынка", "срочно продам", "исполнительн"], 
          "law": "<b>ФЗ № 127-ФЗ «О несостоятельности (банкротстве)» ст. 61.2.</b> Сделки должника в течение 3 лет до банкротства могут быть оспорены. Квартира возвращается в конкурсную массу.", 
@@ -172,7 +169,6 @@ def analyze_safedeal(text: str) -> AnalysisResult:
          "law": "<b>ГК РФ ст. 179. УК РФ ст. 159.</b> Сделка, совершенная неуполномоченным лицом по подложным документам, не влечет юридических последствий.", 
          "fix": "Сверка данных паспорта с официальным списком недействительных паспортов МВД России.", "w": 20.0},
 
-        # --- БЛОК 3: ТРИГГЕРЫ ---
         {"cat": "trigger", "what": "Занижение цены в договоре (ДКП)", 
          "kw": ["занижен", "в конверте", "меньше", "минимальная", "неполная стоимост", "налог", "остальное передадите"], 
          "law": "<b>ГК РФ ст. 170</b> (Притворная сделка). <b>НК РФ ст. 122.</b> При банкротстве продавца суд заставит вернуть квартиру, а покупателю компенсируют лишь сумму из ДКП.", 
@@ -213,13 +209,6 @@ def analyze_safedeal(text: str) -> AnalysisResult:
 
 def main():
     inject_custom_styles()
-    st.markdown("""
-        <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        </style>
-    """, unsafe_allow_html=True)
 
     logo_b64 = get_base64_image("logo.png")
     if logo_b64:
@@ -258,7 +247,6 @@ def main():
                 z_lbl = "ЗЕЛЕНАЯ ЗОНА (КОНТРОЛИРУЕМО)"
                 sub_txt = "Явных критических угроз не выявлено, но базовая проверка обязательна."
             
-            # Генерация официального заголовка акта
             report_id = random.randint(10000, 99999)
             current_date = datetime.now().strftime('%d.%m.%Y %H:%M')
             
