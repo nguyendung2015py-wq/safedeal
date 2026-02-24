@@ -1,4 +1,4 @@
-iimport streamlit as st
+import streamlit as st
 import base64
 import random
 from datetime import datetime
