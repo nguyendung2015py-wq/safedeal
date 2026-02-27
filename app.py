@@ -448,7 +448,7 @@ def main():
         <h3 style="text-align: center; margin-top: 45px; font-size: 1.3rem; font-weight: 800;">СВЯЗАТЬСЯ СО МНОЙ:</h3>
     """, unsafe_allow_html=True)
 
-    tg_link = https://t.me/Artem_Nosov_Vrn""          
+    tg_link = "https://t.me/Artem_Nosov_Vrn"          
     wa_link = "https://wa.me/79601049146"      
     vk_link = "https://vk.com/artem_nosov_vrn"         
     
