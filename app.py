@@ -5,6 +5,8 @@ import html
 import io
 import math
 import time
+import os
+import urllib.request
 from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Tuple
@@ -18,6 +20,8 @@ from reportlab.platypus import (
     HRFlowable, KeepTogether
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 st.set_page_config(
     page_title="SafeDeal — экспертиза сделки",
@@ -259,16 +263,40 @@ def generate_pdf(res, report_id, input_text):
         leftMargin=20*mm, rightMargin=20*mm, topMargin=18*mm, bottomMargin=18*mm,
         title=f"SafeDeal Акт №{report_id}", author="SafeDeal | Артем Носов")
 
+    # СКАЧИВАНИЕ И РЕГИСТРАЦИЯ КИРИЛЛИЧЕСКОГО ШРИФТА (ДЛЯ РЕШЕНИЯ ПРОБЛЕМЫ С КВАДРАТИКАМИ)
+    font_regular = "Helvetica"
+    font_bold = "Helvetica-Bold"
+    
+    try:
+        url_reg = "https://raw.githubusercontent.com/dejavu-fonts/dejavu-fonts/master/ttf/DejaVuSans.ttf"
+        url_bold = "https://raw.githubusercontent.com/dejavu-fonts/dejavu-fonts/master/ttf/DejaVuSans-Bold.ttf"
+        
+        path_reg = "DejaVuSans.ttf"
+        path_bold = "DejaVuSans-Bold.ttf"
+        
+        if not os.path.exists(path_reg):
+            urllib.request.urlretrieve(url_reg, path_reg)
+        if not os.path.exists(path_bold):
+            urllib.request.urlretrieve(url_bold, path_bold)
+            
+        pdfmetrics.registerFont(TTFont('DejaVu', path_reg))
+        pdfmetrics.registerFont(TTFont('DejaVu-Bold', path_bold))
+        
+        font_regular = 'DejaVu'
+        font_bold = 'DejaVu-Bold'
+    except Exception as e:
+        pass # Если нет интернета, останется стандартный шрифт
+
     def S(name, **kw):
         return ParagraphStyle(name, **kw)
 
-    st_h1c = S("h1c", fontName="Helvetica-Bold", fontSize=22, textColor=C_GREEN, alignment=TA_CENTER, leading=28, spaceAfter=3)
-    st_sub = S("sub", fontName="Helvetica", fontSize=9, textColor=C_MUTED, alignment=TA_CENTER, leading=13, spaceAfter=0)
-    st_h2  = S("h2",  fontName="Helvetica-Bold", fontSize=13, textColor=C_GREEN, spaceAfter=4, leading=18, spaceBefore=6)
-    st_h3  = S("h3",  fontName="Helvetica-Bold", fontSize=10, textColor=C_DARK, spaceAfter=2, leading=14)
-    st_bd  = S("bd",  fontName="Helvetica", fontSize=9, textColor=C_DARK, spaceAfter=2, leading=13)
-    st_sm  = S("sm",  fontName="Helvetica", fontSize=8, textColor=C_MUTED, spaceAfter=2, leading=12)
-    st_fix = S("fx",  fontName="Helvetica-Oblique", fontSize=9, textColor=C_SAFE, spaceAfter=2, leading=13)
+    st_h1c = S("h1c", fontName=font_bold, fontSize=22, textColor=C_GREEN, alignment=TA_CENTER, leading=28, spaceAfter=3)
+    st_sub = S("sub", fontName=font_regular, fontSize=9, textColor=C_MUTED, alignment=TA_CENTER, leading=13, spaceAfter=0)
+    st_h2  = S("h2",  fontName=font_bold, fontSize=13, textColor=C_GREEN, spaceAfter=4, leading=18, spaceBefore=6)
+    st_h3  = S("h3",  fontName=font_bold, fontSize=10, textColor=C_DARK, spaceAfter=2, leading=14)
+    st_bd  = S("bd",  fontName=font_regular, fontSize=9, textColor=C_DARK, spaceAfter=2, leading=13)
+    st_sm  = S("sm",  fontName=font_regular, fontSize=8, textColor=C_MUTED, spaceAfter=2, leading=12)
+    st_fix = S("fx",  fontName=font_regular, fontSize=9, textColor=C_SAFE, spaceAfter=2, leading=13)
 
     zone_color = {"danger": C_RED, "warning": C_AMBER, "safe": C_SAFE}.get(res.zone, C_GREEN)
     zone_bg    = {"danger": colors.HexColor("#fff8f8"), "warning": colors.HexColor("#fffbeb"),
@@ -290,12 +318,12 @@ def generate_pdf(res, report_id, input_text):
     ]
     mt = Table(meta_data, colWidths=[50*mm, 120*mm])
     mt.setStyle(TableStyle([
-        ("FONTNAME", (0,0), (-1,-1), "Helvetica"),
-        ("FONTNAME", (0,0), (0,-1),  "Helvetica-Bold"),
+        ("FONTNAME", (0,0), (-1,-1), font_regular),
+        ("FONTNAME", (0,0), (0,-1),  font_bold),
         ("FONTSIZE", (0,0), (-1,-1), 9),
         ("TEXTCOLOR", (0,0), (0,-1), C_MUTED),
         ("TEXTCOLOR", (1,2), (1,3),  zone_color),
-        ("FONTNAME", (1,2), (1,3),   "Helvetica-Bold"),
+        ("FONTNAME", (1,2), (1,3),   font_bold),
         ("TOPPADDING", (0,0), (-1,-1), 3),
         ("BOTTOMPADDING", (0,0), (-1,-1), 3),
     ]))
@@ -303,7 +331,7 @@ def generate_pdf(res, report_id, input_text):
     story.append(Spacer(1, 3*mm))
 
     zt = Table([[Paragraph(f"{res.zone_label} - {res.sub_text}",
-        S("zt", fontName="Helvetica-Bold", fontSize=10, textColor=zone_color, leading=14))]],
+        S("zt", fontName=font_bold, fontSize=10, textColor=zone_color, leading=14))]],
         colWidths=[170*mm])
     zt.setStyle(TableStyle([
         ("BACKGROUND", (0,0), (-1,-1), zone_bg),
@@ -342,7 +370,7 @@ def generate_pdf(res, report_id, input_text):
             t = Table(tdata, colWidths=[50*mm, 65*mm, 55*mm])
             t.setStyle(TableStyle([
                 ("BACKGROUND", (0,0), (-1,0), C_LIGHT),
-                ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+                ("FONTNAME", (0,0), (-1,0), font_bold),
                 ("FONTSIZE", (0,0), (-1,0), 8),
                 ("TEXTCOLOR", (0,0), (-1,0), C_MUTED),
                 ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#fafafa")]),
@@ -361,7 +389,7 @@ def generate_pdf(res, report_id, input_text):
     story.append(Paragraph(
         "Данный акт создан алгоритмической моделью. Носит информационно-аналитический характер "
         "и не является юридической консультацией. SafeDeal | t.me/nosov_s_blog",
-        S("ftr", fontName="Helvetica", fontSize=7.5, textColor=C_MUTED, alignment=TA_CENTER)))
+        S("ftr", fontName=font_regular, fontSize=7.5, textColor=C_MUTED, alignment=TA_CENTER)))
 
     try:
         doc.build(story)
@@ -596,7 +624,7 @@ def tab_audit():
             c_pdf.download_button("📄 Скачать акт PDF", data=pdf_bytes,
                 file_name=f"SafeDeal_{rid}.pdf", mime="application/pdf", use_container_width=True)
         else:
-            c_pdf.error("Ошибка генерации PDF (шрифт). Скачайте TXT.")
+            c_pdf.error("Ошибка генерации PDF. Скачайте TXT.")
         
         lines = [
             "=========================================",
@@ -868,27 +896,9 @@ def tab_stages():
         if is_skip:
             inner_html = "<i style='color:#9ca3af;font-size:.85rem;'>Этап не нужен для данного типа сделки</i>"
         else:
-            inner_html = f"""<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
-<div style="font-size:.82rem;"><span style="font-weight:700;color:#2563eb;">👤 Покупатель:</span><br>{s['buyer']}</div>
-<div style="font-size:.82rem;"><span style="font-weight:700;color:#059669;">🏠 Продавец:</span><br>{s['seller']}</div>
-</div>
-<div style="background:#fffbeb;border-radius:6px;padding:6px 10px;font-size:.8rem;color:#92400e;">
-⚠️ <b>Риск:</b> {s['risk']}
-</div>"""
+            inner_html = f"<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;'><div style='font-size:.82rem;'><span style='font-weight:700;color:#2563eb;'>👤 Покупатель:</span><br>{s['buyer']}</div><div style='font-size:.82rem;'><span style='font-weight:700;color:#059669;'>🏠 Продавец:</span><br>{s['seller']}</div></div><div style='background:#fffbeb;border-radius:6px;padding:6px 10px;font-size:.8rem;color:#92400e;'>⚠️ <b>Риск:</b> {s['risk']}</div>"
 
-        html_str = f"""<div style="display:flex;gap:16px;margin-bottom:16px;opacity:{opacity}">
-<div style="display:flex;flex-direction:column;align-items:center;">
-<div style="width:36px;height:36px;border-radius:50%;background:{'#e5e7eb' if is_skip else '#008a5e'};color:{'#9ca3af' if is_skip else '#fff'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.85rem;flex-shrink:0;">{s['num']}</div>
-<div style="width:2px;flex:1;background:{'#e5e7eb' if is_skip else '#d1fae5'};margin-top:4px;min-height:20px;"></div>
-</div>
-<div style="flex:1;background:#fff;border:1px solid {border_color};border-radius:14px;padding:14px 16px;margin-bottom:4px;">
-<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-<div style="font-weight:800;font-size:1rem;">{s['title']}</div>
-<div style="background:{'#f3f4f6' if is_skip else '#f0fdf7'};color:{'#9ca3af' if is_skip else '#059669'};padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:700;white-space:nowrap;">⏱ {duration}</div>
-</div>
-{inner_html}
-</div>
-</div>"""
+        html_str = f"<div style='display:flex;gap:16px;margin-bottom:16px;opacity:{opacity}'><div style='display:flex;flex-direction:column;align-items:center;'><div style='width:36px;height:36px;border-radius:50%;background:{'#e5e7eb' if is_skip else '#008a5e'};color:{'#9ca3af' if is_skip else '#fff'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.85rem;flex-shrink:0;'>{s['num']}</div><div style='width:2px;flex:1;background:{'#e5e7eb' if is_skip else '#d1fae5'};margin-top:4px;min-height:20px;'></div></div><div style='flex:1;background:#fff;border:1px solid {border_color};border-radius:14px;padding:14px 16px;margin-bottom:4px;'><div style='display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;'><div style='font-weight:800;font-size:1rem;'>{s['title']}</div><div style='background:{'#f3f4f6' if is_skip else '#f0fdf7'};color:{'#9ca3af' if is_skip else '#059669'};padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:700;white-space:nowrap;'>⏱ {duration}</div></div>{inner_html}</div></div>"
         
         st.markdown(html_str, unsafe_allow_html=True)
 
@@ -967,7 +977,7 @@ def main():
     st.markdown("<h3 style='text-align:center;margin-top:40px;font-size:1.2rem;font-weight:800;'>СВЯЗАТЬСЯ СО МНОЙ:</h3>", unsafe_allow_html=True)
 
     TG = "https://t.me/Artem_Nosov_Vrn"
-    WA = "https://wa.me/79601049146"   
+    WA = "https://wa.me/79000000000"   
     VK = "https://vk.com/artem_nosov_vrn"            
 
     st.markdown(f"""
