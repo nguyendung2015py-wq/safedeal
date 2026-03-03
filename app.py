@@ -1034,7 +1034,7 @@ def main():
     st.markdown("<h3 style='text-align:center;margin-top:40px;font-size:1.2rem;font-weight:800;'>СВЯЗАТЬСЯ СО МНОЙ:</h3>", unsafe_allow_html=True)
 
     TG = "https://t.me/Artem_Nosov_Vrn"
-    WA = "https://wa.me/79000000000"   
+    WA = "https://wa.me/79601049146"   
     VK = "https://vk.com/artem_nosov_vrn"            
 
     st.markdown(f"""
