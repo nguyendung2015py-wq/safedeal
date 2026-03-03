@@ -6,18 +6,18 @@ import io
 import math
 import time
 import os
-import urllib.request
 from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Tuple
 
+# Сторонние библиотеки должны быть установлены (pip install reportlab)
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, KeepTogether
+    HRFlowable, KeepTogether, Flowable
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfbase import pdfmetrics
@@ -29,7 +29,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ─── КОНСТАНТЫ ───────────────────────────────
+# ─── КОНСТАНТЫ И НАСТРОЙКИ ───────────────────
+
+# Имена файлов шрифтов, которые ДОЛЖНЫ лежать рядом с app.py
+FONT_REGULAR_FILE = "DejaVuSans.ttf"
+FONT_BOLD_FILE = "DejaVuSans-Bold.ttf"
+LOGO_FILE = "logo.png"
 
 RISKS_CONFIG = [
     # ── ФИНАНСОВЫЕ СХЕМЫ ──────────────────────────────────────────────────────
@@ -52,7 +57,7 @@ RISKS_CONFIG = [
     {"cat": "Объект", "what": "Незаконная перепланировка",
      "kw": ["перепланировк","снесли стен","мокрая точк","объединили","неузакон","переделали","снос стены"],
      "law": "ЖК РФ ст. 29. Штраф 2 000–2 500 ₽ + обязанность привести в исходное состояние (расходы 50 000–500 000 ₽). При продаже банки отказывают в ипотеке на такой объект.",
-     "fix": "Требовать узаконивания до сделки или корректировки цены на стоимость работ по восстановлению.", "w": 30.0},
+     "fix": "Требовать узаконивания до сделки или корректировки цены на стоимость работ по টানвосстановлению.", "w": 30.0},
 
     {"cat": "Объект", "what": "Объект в залоге (ипотека банка)",
      "kw": ["в ипотеке","залог","обременен","под залогом","ипотечн"],
@@ -205,10 +210,12 @@ class AnalysisResult:
 
 def get_base64_image(path):
     try:
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                return base64.b64encode(f.read()).decode()
     except Exception:
         return None
+    return None
 
 def _detect(text, keywords):
     t = text.lower()
@@ -246,7 +253,7 @@ def analyze_safedeal(text):
 
     return AnalysisResult(score, items, z, l, s)
 
-# ─── PDF ─────────────────────────────────────
+# ─── PDF ГЕНЕРАЦИЯ (С КРУГЛЫМ ЛОГОТИПОМ) ─────
 
 C_GREEN = colors.HexColor("#008a5e")
 C_RED   = colors.HexColor("#dc2626")
@@ -257,40 +264,63 @@ C_MUTED = colors.HexColor("#6b7280")
 C_LIGHT = colors.HexColor("#f9fafb")
 C_BORD  = colors.HexColor("#e5e7eb")
 
+# Кастомный класс для обрезки картинки в идеальный круг
+class CircularImage(Flowable):
+    def __init__(self, img_path, size):
+        Flowable.__init__(self)
+        self.img_path = img_path
+        self.size = size
+
+    def wrap(self, availWidth, availHeight):
+        return self.size, self.size
+
+    def draw(self):
+        c = self.canv
+        # 1. Рисуем картинку, обрезанную по кругу
+        c.saveState()
+        p = c.beginPath()
+        p.circle(self.size / 2.0, self.size / 2.0, self.size / 2.0)
+        c.clipPath(p, stroke=0)
+        c.drawImage(self.img_path, 0, 0, width=self.size, height=self.size)
+        c.restoreState()
+        
+        # 2. Рисуем зеленую рамку поверх (стиль SafeDeal)
+        c.saveState()
+        c.setStrokeColor(C_GREEN)
+        c.setLineWidth(1.5)
+        c.circle(self.size / 2.0, self.size / 2.0, self.size / 2.0)
+        c.restoreState()
+
+
 def generate_pdf(res, report_id, input_text):
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
-        leftMargin=20*mm, rightMargin=20*mm, topMargin=18*mm, bottomMargin=18*mm,
+        leftMargin=20*mm, rightMargin=20*mm, topMargin=15*mm, bottomMargin=15*mm,
         title=f"SafeDeal Акт №{report_id}", author="SafeDeal | Артем Носов")
 
-    # СКАЧИВАНИЕ И РЕГИСТРАЦИЯ КИРИЛЛИЧЕСКОГО ШРИФТА (ДЛЯ РЕШЕНИЯ ПРОБЛЕМЫ С КВАДРАТИКАМИ)
-    font_regular = "Helvetica"
+    # Определение пути к шрифтам и лого
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    path_reg = os.path.join(curr_dir, FONT_REGULAR_FILE)
+    path_bold = os.path.join(curr_dir, FONT_BOLD_FILE)
+    logo_path = os.path.join(curr_dir, LOGO_FILE)
+
+    # Регистрация шрифтов
+    font_regular = "Helvetica" 
     font_bold = "Helvetica-Bold"
     
-    try:
-        url_reg = "https://raw.githubusercontent.com/dejavu-fonts/dejavu-fonts/master/ttf/DejaVuSans.ttf"
-        url_bold = "https://raw.githubusercontent.com/dejavu-fonts/dejavu-fonts/master/ttf/DejaVuSans-Bold.ttf"
-        
-        path_reg = "DejaVuSans.ttf"
-        path_bold = "DejaVuSans-Bold.ttf"
-        
-        if not os.path.exists(path_reg):
-            urllib.request.urlretrieve(url_reg, path_reg)
-        if not os.path.exists(path_bold):
-            urllib.request.urlretrieve(url_bold, path_bold)
-            
-        pdfmetrics.registerFont(TTFont('DejaVu', path_reg))
-        pdfmetrics.registerFont(TTFont('DejaVu-Bold', path_bold))
-        
-        font_regular = 'DejaVu'
-        font_bold = 'DejaVu-Bold'
-    except Exception as e:
-        pass # Если нет интернета, останется стандартный шрифт
-
+    if os.path.exists(path_reg) and os.path.exists(path_bold):
+        try:
+            pdfmetrics.registerFont(TTFont('DejaVu', path_reg))
+            pdfmetrics.registerFont(TTFont('DejaVu-Bold', path_bold))
+            font_regular = 'DejaVu'
+            font_bold = 'DejaVu-Bold'
+        except Exception:
+            pass
+    
     def S(name, **kw):
         return ParagraphStyle(name, **kw)
 
-    st_h1c = S("h1c", fontName=font_bold, fontSize=22, textColor=C_GREEN, alignment=TA_CENTER, leading=28, spaceAfter=3)
+    st_h1c = S("h1c", fontName=font_bold, fontSize=20, textColor=C_GREEN, alignment=TA_CENTER, leading=26, spaceAfter=2)
     st_sub = S("sub", fontName=font_regular, fontSize=9, textColor=C_MUTED, alignment=TA_CENTER, leading=13, spaceAfter=0)
     st_h2  = S("h2",  fontName=font_bold, fontSize=13, textColor=C_GREEN, spaceAfter=4, leading=18, spaceBefore=6)
     st_h3  = S("h3",  fontName=font_bold, fontSize=10, textColor=C_DARK, spaceAfter=2, leading=14)
@@ -304,9 +334,30 @@ def generate_pdf(res, report_id, input_text):
 
     story = []
 
-    story.append(Paragraph("SafeDeal", st_h1c))
+    # Вставка круглого логотипа по центру
+    if os.path.exists(logo_path):
+        try:
+            logo_size = 28 * mm
+            c_img = CircularImage(logo_path, logo_size)
+            # Обертываем в таблицу, чтобы выровнять строго по центру
+            t_logo = Table([[c_img]], colWidths=[logo_size], hAlign='CENTER')
+            t_logo.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('LEFTPADDING', (0,0), (-1,-1), 0),
+                ('RIGHTPADDING', (0,0), (-1,-1), 0),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+            ]))
+            story.append(t_logo)
+            story.append(Spacer(1, 3*mm))
+        except Exception:
+            pass
+
+    # Заголовок
+    story.append(Paragraph("Акт аудита сделки", st_h1c))
     story.append(Paragraph("Авторский сервис аудита недвижимости | Артем Носов", st_sub))
-    story.append(Spacer(1, 5*mm))
+    story.append(Spacer(1, 4*mm))
     story.append(HRFlowable(width="100%", thickness=2, color=C_GREEN))
     story.append(Spacer(1, 4*mm))
 
@@ -316,6 +367,7 @@ def generate_pdf(res, report_id, input_text):
         ["Индекс риска:", f"{res.total_risk}%"],
         ["Решение:", res.zone_label],
     ]
+    
     mt = Table(meta_data, colWidths=[50*mm, 120*mm])
     mt.setStyle(TableStyle([
         ("FONTNAME", (0,0), (-1,-1), font_regular),
@@ -330,6 +382,7 @@ def generate_pdf(res, report_id, input_text):
     story.append(mt)
     story.append(Spacer(1, 3*mm))
 
+    # Блок решения
     zt = Table([[Paragraph(f"{res.zone_label} - {res.sub_text}",
         S("zt", fontName=font_bold, fontSize=10, textColor=zone_color, leading=14))]],
         colWidths=[170*mm])
@@ -343,12 +396,14 @@ def generate_pdf(res, report_id, input_text):
     story.append(zt)
     story.append(Spacer(1, 5*mm))
 
+    # Описание
     story.append(Paragraph("Описание ситуации", st_h2))
     story.append(Paragraph(html.escape(input_text[:600]), st_bd))
     story.append(Spacer(1, 4*mm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=C_BORD))
     story.append(Spacer(1, 4*mm))
 
+    # Риски
     if not res.items:
         story.append(Paragraph("Явных маркеров риска не обнаружено.", st_bd))
     else:
@@ -395,7 +450,8 @@ def generate_pdf(res, report_id, input_text):
         doc.build(story)
         buf.seek(0)
         return buf.read()
-    except Exception:
+    except Exception as e:
+        print(f"Ошибка генерации PDF: {e}")
         return None
 
 # ─── ФИНАНСЫ ─────────────────────────────────
@@ -619,12 +675,13 @@ def tab_audit():
 
         st.markdown("---")
         c_pdf, c_txt = st.columns(2)
+        # ГЕНЕРАЦИЯ PDF
         pdf_bytes = generate_pdf(res, rid, text)
         if pdf_bytes:
             c_pdf.download_button("📄 Скачать акт PDF", data=pdf_bytes,
                 file_name=f"SafeDeal_{rid}.pdf", mime="application/pdf", use_container_width=True)
         else:
-            c_pdf.error("Ошибка генерации PDF. Скачайте TXT.")
+            c_pdf.error("Ошибка генерации PDF. Убедитесь, что файлы шрифтов на месте.")
         
         lines = [
             "=========================================",
@@ -943,7 +1000,7 @@ def main():
     if "my_text" not in st.session_state:
         st.session_state.my_text = ""
 
-    logo_b64 = get_base64_image("logo.png")
+    logo_b64 = get_base64_image(LOGO_FILE)
     logo_html = (f'<img src="data:image/png;base64,{logo_b64}" class="logo-img">'
                  if logo_b64 else "<div style='font-size:52px;margin-bottom:14px;'>🏢</div>")
 
@@ -977,7 +1034,7 @@ def main():
     st.markdown("<h3 style='text-align:center;margin-top:40px;font-size:1.2rem;font-weight:800;'>СВЯЗАТЬСЯ СО МНОЙ:</h3>", unsafe_allow_html=True)
 
     TG = "https://t.me/Artem_Nosov_Vrn"
-    WA = "https://wa.me/79601049146"   
+    WA = "https://wa.me/79000000000"   
     VK = "https://vk.com/artem_nosov_vrn"            
 
     st.markdown(f"""
